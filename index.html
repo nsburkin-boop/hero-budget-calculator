@@ -1,5 +1,457 @@
-<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Лига Героев — бюджет мерча</title><style>:root{font-family:Arial,sans-serif;color:#f3f6f8;background:#101820}*{box-sizing:border-box}body{margin:0;padding:28px}main{max-width:1120px;margin:auto}h1{font-size:clamp(25px,4vw,40px);margin:6px 0 12px}.accent{color:#b9eb45}.sub{color:#aab7c2}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:16px;margin:24px 0}.panel{background:#1a2732;border:1px solid #33434e;border-radius:16px;padding:20px}.panel h2{font-size:18px;margin:0 0 18px}label{display:block;color:#c6d0d8;font-size:14px;margin:15px 0 6px}input[type=number]{width:100%;background:#0e1821;border:1px solid #55636b;border-radius:9px;padding:11px;color:white;font-size:17px}input[type=range]{width:100%;accent-color:#b9eb45;margin:12px 0 0}.metric{font-size:clamp(23px,3vw,34px);font-weight:750;margin-top:8px}.small{color:#aab7c2;font-size:13px}.bar{height:17px;background:#31414a;border-radius:12px;overflow:hidden;display:flex;margin:16px 0}.bar span:first-child{background:#b9eb45}.bar span:last-child{background:#5cb4f5}.warning{color:#ffb86c;font-weight:bold}.ok{color:#b9eb45}.footer{margin:24px 0;color:#aab7c2;font-size:13px}button{background:#b9eb45;color:#101820;border:0;border-radius:10px;padding:11px 18px;font-weight:bold;cursor:pointer}</style></head><body><main><div class="accent">HERO LEAGUE / MERCH 2027</div><h1>Интерактивный бюджет мерча</h1><p class="sub">Общая цель распределяется между офлайн- и онлайн-продажами. Выберите, какой канал рассчитывается как остаток до цели.</p><section class="grid"><div class="panel"><h2>Общая цель</h2><label>Целевая выручка, ₽</label><input id="goal" type="number" min="0" step="1000000" value="80000000"><label>Участники мероприятий, человек</label><input id="audience" type="number" min="0" step="1" value="59013"><label>Автоматически рассчитывать</label><select id="mode" style="width:100%;padding:12px;background:#0e1821;color:white;border:1px solid #55636b;border-radius:9px"><option value="online">Онлайн как остаток от офлайна</option><option value="offline">Офлайн как остаток от онлайна</option></select></div><div class="panel"><h2>Офлайн-продажи</h2><label>Конверсия участников, %</label><input id="conversion" type="number" min="0" max="100" step="0.1" value="20"><input id="conversionRange" type="range" min="0" max="100" step="0.1" value="20"><label>Средний чек офлайн, ₽</label><input id="offlineCheck" type="number" min="1" step="100" value="2500"><label>Покупателей офлайн (можно изменить)</label><input id="offlineBuyers" type="number" min="0" step="1" value="11803"></div><div class="panel"><h2>Онлайн-продажи</h2><label>Средний чек онлайн, ₽</label><input id="onlineCheck" type="number" min="1" step="100" value="2500"><label>Онлайн-заказов (можно изменить)</label><input id="onlineOrders" type="number" min="0" step="1" value="20197"><p class="small">При изменении онлайн-заказов калькулятор автоматически переключится на расчёт необходимого офлайна.</p></div></section><section class="grid"><div class="panel"><div class="small">Выручка офлайн</div><div class="metric" id="offlineRevenue"></div><div class="small" id="offlineDetail"></div></div><div class="panel"><div class="small">Выручка онлайн</div><div class="metric" id="onlineRevenue"></div><div class="small" id="onlineDetail"></div></div><div class="panel"><div class="small">Общая выручка</div><div class="metric accent" id="totalRevenue"></div><div class="small" id="totalDetail"></div></div></section><div class="panel"><h2>Распределение целевой выручки</h2><div class="bar"><span id="offlineBar"></span><span id="onlineBar"></span></div><div id="split"></div><p id="status"></p><button id="reset">Сбросить параметры</button></div><p class="footer">Сценарная модель: онлайн-заказы и офлайн-покупатели округляются до целых. При невозможности достичь цели точно отображается отклонение. Корпоративные продажи не учитываются.</p></main><script>
-const ids=['goal','audience','conversion','conversionRange','offlineCheck','offlineBuyers','onlineCheck','onlineOrders','mode'];const el=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)]));const out=id=>document.getElementById(id);const n=id=>Math.max(0,Number(el[id].value)||0);const rub=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';const integer=v=>Math.max(0,Math.round(v));let syncing=false;
-function update(source){if(syncing)return;syncing=true;const goal=n('goal'),audience=integer(n('audience')),oc=Math.max(1,n('offlineCheck')),nc=Math.max(1,n('onlineCheck'));let buyers=integer(n('offlineBuyers')),orders=integer(n('onlineOrders'));let mode=el.mode.value;if(source==='onlineOrders'){mode='offline';el.mode.value=mode}if(['conversion','conversionRange','audience'].includes(source)){let conv=Math.min(100,n(source==='conversionRange'?'conversionRange':'conversion'));buyers=integer(audience*conv/100);el.offlineBuyers.value=buyers}if(source==='offlineBuyers'){buyers=Math.min(audience,buyers);el.offlineBuyers.value=buyers}if(mode==='online'){orders=integer(Math.max(0,goal-buyers*oc)/nc);el.onlineOrders.value=orders}else{buyers=integer(Math.max(0,goal-orders*nc)/oc);el.offlineBuyers.value=buyers}const conv=audience?buyers/audience*100:0;el.conversion.value=Number(conv.toFixed(2));el.conversionRange.value=Math.min(100,conv);const off=buyers*oc,on=orders*nc,total=off+on,delta=goal-total;out('offlineRevenue').textContent=rub(off);out('onlineRevenue').textContent=rub(on);out('totalRevenue').textContent=rub(total);out('offlineDetail').textContent=buyers.toLocaleString('ru-RU')+' покупателей · '+conv.toFixed(2)+'% конверсия';out('onlineDetail').textContent=orders.toLocaleString('ru-RU')+' заказов';out('totalDetail').textContent=goal?((total/goal)*100).toFixed(1)+'% от цели':'Цель не задана';const offShare=total?off/total*100:0;out('offlineBar').style.width=offShare+'%';out('onlineBar').style.width=(total?100-offShare:0)+'%';out('split').textContent='Офлайн: '+offShare.toFixed(1)+'% · Онлайн: '+(total?100-offShare:0).toFixed(1)+'%';let warnings=[];if(buyers>audience)warnings.push('Для достижения цели требуется больше офлайн-покупателей, чем участников.');if(Math.abs(delta)>Math.max(oc,nc))warnings.push((delta>0?'До цели не хватает ':'Превышение цели: ')+rub(Math.abs(delta))+'.');if(mode==='online'&&off>goal)warnings.push('Офлайн-выручка уже превышает общую цель; онлайн-заказы установлены в 0.');out('status').className=warnings.length?'warning':'ok';out('status').textContent=warnings.join(' ')||'Сценарий рассчитан. Отклонение от цели из-за округления: '+rub(Math.abs(delta))+'.';syncing=false}
-ids.forEach(id=>el[id].addEventListener(id==='mode'?'change':'input',()=>update(id)));out('reset').addEventListener('click',()=>{Object.entries({goal:50000000,audience:59013,conversion:20,conversionRange:20,offlineCheck:2500,offlineBuyers:11803,onlineCheck:2500,onlineOrders:20197,mode:'online'}).forEach(([k,v])=>el[k].value=v);update('conversion')});update('conversion');
-</script></body></html>
+
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Лига Героев — бюджет мерча 2027</title>
+
+  <style>
+    :root {
+      font-family: Arial, sans-serif;
+      color: #f3f6f8;
+      background: #101820;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 28px;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: auto;
+    }
+
+    h1 {
+      font-size: clamp(25px, 4vw, 40px);
+      margin: 6px 0 12px;
+    }
+
+    .accent { color: #b9eb45; }
+    .sub { color: #aab7c2; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .panel {
+      background: #1a2732;
+      border: 1px solid #33434e;
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .panel h2 {
+      font-size: 18px;
+      margin: 0 0 18px;
+    }
+
+    label {
+      display: block;
+      color: #c6d0d8;
+      font-size: 14px;
+      margin: 15px 0 6px;
+    }
+
+    input[type=number], select {
+      width: 100%;
+      background: #0e1821;
+      border: 1px solid #55636b;
+      border-radius: 9px;
+      padding: 11px;
+      color: white;
+      font-size: 17px;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: #b9eb45;
+      margin: 12px 0 0;
+    }
+
+    .metric {
+      font-size: clamp(23px, 3vw, 34px);
+      font-weight: 750;
+      margin-top: 8px;
+    }
+
+    .small {
+      color: #aab7c2;
+      font-size: 13px;
+    }
+
+    .bar {
+      height: 17px;
+      background: #31414a;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      margin: 16px 0;
+    }
+
+    .bar span:first-child { background: #b9eb45; }
+    .bar span:last-child { background: #5cb4f5; }
+
+    .warning {
+      color: #ffb86c;
+      font-weight: bold;
+    }
+
+    .ok { color: #b9eb45; }
+
+    .footer {
+      margin: 24px 0;
+      color: #aab7c2;
+      font-size: 13px;
+    }
+
+    button {
+      background: #b9eb45;
+      color: #101820;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+<main>
+  <div class="accent">HERO LEAGUE / MERCH 2027</div>
+  <h1>Интерактивный бюджет мерча</h1>
+
+  <p class="sub">
+    Общая цель распределяется между офлайн- и онлайн-продажами.
+    Изменяйте параметры и выбирайте канал, который
+    рассчитывается автоматически.
+  </p>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Общая цель</h2>
+
+      <label>Целевая выручка, ₽</label>
+      <input id="goal" type="number" min="0"
+             step="1000000" value="50000000">
+
+      <label>Участники мероприятий, человек</label>
+      <input id="audience" type="number" min="0"
+             step="1" value="59013">
+
+      <label>Автоматически рассчитывать</label>
+      <select id="mode">
+        <option value="online">
+          Онлайн как остаток от офлайна
+        </option>
+        <option value="offline">
+          Офлайн как остаток от онлайна
+        </option>
+      </select>
+    </div>
+
+    <div class="panel">
+      <h2>Офлайн-продажи</h2>
+
+      <label>Конверсия участников, %</label>
+      <input id="conversion" type="number"
+             min="0" max="100" step="0.01"
+             value="12.54">
+
+      <input id="conversionRange" type="range"
+             min="0" max="100" step="0.01"
+             value="12.54">
+
+      <label>Средний чек офлайн, ₽</label>
+      <input id="offlineCheck" type="number"
+             min="1" step="100" value="2500">
+
+      <label>Покупателей офлайн</label>
+      <input id="offlineBuyers" type="number"
+             min="0" step="1" value="7400">
+    </div>
+
+    <div class="panel">
+      <h2>Онлайн-продажи</h2>
+
+      <label>Средний чек онлайн, ₽</label>
+      <input id="onlineCheck" type="number"
+             min="1" step="100" value="2500">
+
+      <label>Онлайн-заказов</label>
+      <input id="onlineOrders" type="number"
+             min="0" step="1" value="12600">
+
+      <p class="small">
+        При изменении количества онлайн-заказов
+        калькулятор автоматически переключается
+        на расчёт необходимого офлайна.
+      </p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <div class="small">Выручка офлайн</div>
+      <div class="metric" id="offlineRevenue"></div>
+      <div class="small" id="offlineDetail"></div>
+    </div>
+
+    <div class="panel">
+      <div class="small">Выручка онлайн</div>
+      <div class="metric" id="onlineRevenue"></div>
+      <div class="small" id="onlineDetail"></div>
+    </div>
+
+    <div class="panel">
+      <div class="small">Общая выручка</div>
+      <div class="metric accent" id="totalRevenue"></div>
+      <div class="small" id="totalDetail"></div>
+    </div>
+  </section>
+
+  <div class="panel">
+    <h2>Распределение целевой выручки</h2>
+
+    <div class="bar">
+      <span id="offlineBar"></span>
+      <span id="onlineBar"></span>
+    </div>
+
+    <div id="split"></div>
+    <p id="status"></p>
+
+    <button id="reset">Сбросить параметры</button>
+  </div>
+
+  <p class="footer">
+    Сценарная модель. Количество покупателей и заказов
+    округляется до целых. При невозможности точно
+    достичь цели отображается отклонение.
+    Корпоративные продажи не учитываются.
+  </p>
+</main>
+
+<script>
+const defaults = {
+  goal: 50000000,
+  audience: 59013,
+  conversion: 12.54,
+  conversionRange: 12.54,
+  offlineCheck: 2500,
+  offlineBuyers: 7400,
+  onlineCheck: 2500,
+  onlineOrders: 12600,
+  mode: 'online'
+};
+
+const ids = Object.keys(defaults);
+
+const el = Object.fromEntries(
+  ids.map(id => [id, document.getElementById(id)])
+);
+
+const out = id => document.getElementById(id);
+
+const n = id => Math.max(
+  0,
+  Number(el[id].value) || 0
+);
+
+const rub = value =>
+  Math.round(value).toLocaleString('ru-RU') + ' ₽';
+
+const integer = value =>
+  Math.max(0, Math.round(value));
+
+let syncing = false;
+
+function update(source) {
+  if (syncing) return;
+  syncing = true;
+
+  const goal = n('goal');
+  const audience = integer(n('audience'));
+  const offlineCheck = Math.max(1, n('offlineCheck'));
+  const onlineCheck = Math.max(1, n('onlineCheck'));
+
+  let buyers = integer(n('offlineBuyers'));
+  let orders = integer(n('onlineOrders'));
+  let mode = el.mode.value;
+
+  if (source === 'onlineOrders') {
+    mode = 'offline';
+    el.mode.value = mode;
+  }
+
+  if (
+    source === 'offlineBuyers' ||
+    source === 'conversion' ||
+    source === 'conversionRange' ||
+    source === 'audience'
+  ) {
+    mode = 'online';
+    el.mode.value = mode;
+  }
+
+  if (
+    source === 'conversion' ||
+    source === 'conversionRange'
+  ) {
+    const conversion = Math.min(
+      100,
+      n(source)
+    );
+
+    buyers = integer(audience * conversion / 100);
+    el.offlineBuyers.value = buyers;
+  }
+
+  if (source === 'audience') {
+    const conversion = Math.min(
+      100,
+      n('conversion')
+    );
+
+    buyers = integer(audience * conversion / 100);
+    el.offlineBuyers.value = buyers;
+  }
+
+  if (source === 'offlineBuyers') {
+    buyers = Math.min(audience, buyers);
+    el.offlineBuyers.value = buyers;
+  }
+
+  if (mode === 'online') {
+    orders = integer(
+      Math.max(0, goal - buyers * offlineCheck)
+      / onlineCheck
+    );
+    el.onlineOrders.value = orders;
+  } else {
+    buyers = integer(
+      Math.max(0, goal - orders * onlineCheck)
+      / offlineCheck
+    );
+    el.offlineBuyers.value = buyers;
+  }
+
+  const conversion = audience
+    ? buyers / audience * 100
+    : 0;
+
+  el.conversion.value = Number(conversion.toFixed(2));
+  el.conversionRange.value = Math.min(100, conversion);
+
+  const offlineRevenue = buyers * offlineCheck;
+  const onlineRevenue = orders * onlineCheck;
+  const total = offlineRevenue + onlineRevenue;
+  const delta = goal - total;
+
+  out('offlineRevenue').textContent =
+    rub(offlineRevenue);
+
+  out('onlineRevenue').textContent =
+    rub(onlineRevenue);
+
+  out('totalRevenue').textContent =
+    rub(total);
+
+  out('offlineDetail').textContent =
+    buyers.toLocaleString('ru-RU') +
+    ' покупателей · ' +
+    conversion.toFixed(2) +
+    '% конверсия';
+
+  out('onlineDetail').textContent =
+    orders.toLocaleString('ru-RU') +
+    ' заказов';
+
+  out('totalDetail').textContent = goal
+    ? (total / goal * 100).toFixed(1) + '% от цели'
+    : 'Цель не задана';
+
+  const offlineShare = total
+    ? offlineRevenue / total * 100
+    : 0;
+
+  const onlineShare = total
+    ? 100 - offlineShare
+    : 0;
+
+  out('offlineBar').style.width =
+    offlineShare + '%';
+
+  out('onlineBar').style.width =
+    onlineShare + '%';
+
+  out('split').textContent =
+    'Офлайн: ' + offlineShare.toFixed(1) +
+    '% · Онлайн: ' + onlineShare.toFixed(1) + '%';
+
+  const warnings = [];
+
+  if (buyers > audience) {
+    warnings.push(
+      'Для достижения цели требуется больше ' +
+      'офлайн-покупателей, чем участников.'
+    );
+  }
+
+  if (Math.abs(delta) > Math.max(offlineCheck, onlineCheck)) {
+    warnings.push(
+      (delta > 0
+        ? 'До цели не хватает '
+        : 'Превышение цели: ') +
+      rub(Math.abs(delta)) + '.'
+    );
+  }
+
+  if (mode === 'online' && offlineRevenue > goal) {
+    warnings.push(
+      'Офлайн-выручка уже превышает общую цель.'
+    );
+  }
+
+  if (mode === 'offline' && onlineRevenue > goal) {
+    warnings.push(
+      'Онлайн-выручка уже превышает общую цель.'
+    );
+  }
+
+  out('status').className =
+    warnings.length ? 'warning' : 'ok';
+
+  out('status').textContent = warnings.join(' ') ||
+    'Сценарий рассчитан. Отклонение от цели: ' +
+    rub(Math.abs(delta)) + '.';
+
+  syncing = false;
+}
+
+ids.forEach(id => {
+  el[id].addEventListener(
+    id === 'mode' ? 'change' : 'input',
+    () => update(id)
+  );
+});
+
+out('reset').addEventListener('click', () => {
+  Object.entries(defaults).forEach(([key, value]) => {
+    el[key].value = value;
+  });
+
+  update('reset');
+});
+
+update('reset');
+</script>
+</body>
+</html>
